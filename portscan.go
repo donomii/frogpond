@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net"
-	"net/http"
 	"strings"
 	"sync"
 	"time"
