@@ -1,4 +1,4 @@
-module frogpond
+module github.com/donomii/frogpond
 
 go 1.20.0
 
