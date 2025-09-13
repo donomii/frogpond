@@ -1,4 +1,4 @@
-#🐸 Frogpond
+# 🐸 Frogpond
 
 Frogpond is a simple, peer-to-peer, CRDT, key value store and host discovery service.  I use it on all my home computers to find each other and share configuration and a small amount of data.  It is also available as a library for other applications, e.g. [clusterF](https://github.com/donomii/clusterf)
 
