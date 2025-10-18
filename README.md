@@ -1,16 +1,10 @@
-# Frogpond
+# 🐸 Frogpond
 
-Frogpond is a simple, INSECURE peer-to-peer key value store and host discovery service.  I use it on all my home computers to find each other and share configuration and a small amount of data.
-
-Frogpond is a library that can be used in other applications, and there is also a stand-alone server and client that can connect to the embedded library or work entirely on their own.
-
-There is a simple demonstration of the library used in the "trayheadless" program, which keeps my Raspberry Pis and other small computers in contact with my desktop.
-
-## Insecure
+Frogpond is a simple, peer-to-peer, CRDT, key value store and host discovery service.  I use it on all my home computers to find each other and share configuration and a small amount of data.  It is also available as a library for other applications, e.g. [clusterF](https://github.com/donomii/clusterf)
 
 Frogpond is not secure.  It is not encrypted, and it does not authenticate.  It is not intended for use on the Internet.  It is intended for use on a local network, where the only people who can see the traffic are people you trust.
 
-Do not, under any circumstances, use Frogpond on the Internet.
+Do not, under any circumstances, use Frogpond on the Internet or any other unsecured network.
 
 ## Quick Start
 
@@ -60,7 +54,7 @@ The complete list of commands for the client:
 
 ## Library Use
 
-The best example is the frogpond stand alone server. Mainly you have to run `StartServer()`; it internally announces to peers and periodically syncs peer and key/value data. You can also call `UpdatePeers()` and `UpdatePeersData()` directly if embedding the library.
+Frogpond is available as a library, and is used as the core of the [clusterf](https://github.com/donomii/clusterf) project. Mainly you have to run `StartServer()`; it internally announces to peers and periodically syncs peer and key/value data. You can also call `UpdatePeers()` and `UpdatePeersData()` directly if embedding the library.
 
 Data model notes:
 - `DataPoint.Key` and `DataPoint.Value` are `[]byte`. When serialized to JSON they are base64‑encoded (standard Go `encoding/json` behavior). Use the helper methods on `Node` (e.g., `SetDataPointWithPrefix_str`) for common string workflows.
