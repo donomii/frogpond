@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"gitlab.com/donomii/frogpond"
+	"github.com/donomii/frogpond"
 )
 
 func SendDataPool(dpl []frogpond.DataPoint, port uint) {

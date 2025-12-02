@@ -8,7 +8,7 @@ import (
 
 	"fmt"
 
-	"gitlab.com/donomii/frogpond"
+	"github.com/donomii/frogpond"
 )
 
 func main() {

@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/tchap/go-patricia/patricia"
 )
 
 type DataPoint struct {
@@ -51,51 +53,66 @@ func (a DataPoolList) Less(i, j int) bool { return bytes.Compare(a[i].Key, a[j].
 func (a DataPoolList) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 
 type DataPoolMap struct {
-	mu sync.RWMutex
-	m  map[string]DataPoint
+	mu   sync.RWMutex
+	trie *patricia.Trie
 }
 
 func NewDataPoolMap() *DataPoolMap {
-	return &DataPoolMap{m: make(map[string]DataPoint)}
+	return &DataPoolMap{trie: patricia.NewTrie()}
 }
 
 func (dpm *DataPoolMap) Get(key string) (DataPoint, bool) {
 	dpm.mu.RLock()
 	defer dpm.mu.RUnlock()
-	v, ok := dpm.m[key]
-	if !ok {
-		return DataPoint{}, ok
+	item := dpm.trie.Get(patricia.Prefix(key))
+	if item == nil {
+		return DataPoint{}, false
 	}
-	return v.DeepCopy(), ok
+	v, ok := item.(DataPoint)
+	if !ok {
+		panic("invalid data entered into data pool")
+	}
+	return v.DeepCopy(), true
 }
 
 func (dpm *DataPoolMap) Set(key string, value DataPoint) {
 	dpm.mu.Lock()
 	defer dpm.mu.Unlock()
-	dpm.m[key] = value.DeepCopy()
+	dpm.trie.Set(patricia.Prefix(key), value.DeepCopy())
 }
 
 func (dpm *DataPoolMap) Delete(key string) {
 	dpm.mu.Lock()
 	defer dpm.mu.Unlock()
-	delete(dpm.m, key)
+	dpm.trie.Delete(patricia.Prefix(key))
 }
 
 func (dpm *DataPoolMap) ForEach(f func(string, DataPoint)) {
 	dpm.mu.RLock()
 	defer dpm.mu.RUnlock()
-	for k, v := range dpm.m {
-		f(k, v.DeepCopy())
-	}
+	_ = dpm.trie.Visit(func(prefix patricia.Prefix, item patricia.Item) error {
+		v, ok := item.(DataPoint)
+		if !ok {
+			panic("invalid data entered into data pool")
+		}
+		f(string(prefix), v.DeepCopy())
+		return nil
+	})
 }
 
 func (dpm *DataPoolMap) ToList() DataPoolList {
 	dpm.mu.RLock()
 	defer dpm.mu.RUnlock()
 	out := DataPoolList{}
-	for _, v := range dpm.m {
+	_ = dpm.trie.Visit(func(_ patricia.Prefix, item patricia.Item) error {
+		v, ok := item.(DataPoint)
+		if !ok {
+			panic("invalid data entered into data pool")
+		}
 		out = append(out, v.DeepCopy())
-	}
+
+		return nil
+	})
 	sort.Sort(out)
 	return out
 }
@@ -104,7 +121,7 @@ func (dpm *DataPoolMap) FromList(dl DataPoolList) {
 	dpm.mu.Lock()
 	defer dpm.mu.Unlock()
 	for _, v := range dl {
-		dpm.m[string(v.Key)] = v.DeepCopy()
+		dpm.trie.Set(patricia.Prefix(v.Key), v.DeepCopy())
 	}
 }
 

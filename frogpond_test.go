@@ -67,7 +67,7 @@ func TestNode_SetGetDeleteDataPoint(t *testing.T) {
 	if string(dp.Value) != "bar" {
 		t.Errorf("expected value 'bar', got %v", dp.Value)
 	}
-	n.DeleteDataPoint(key)
+	n.DeleteDataPoint(key, 0)
 	dp = n.GetDataPoint(key)
 	if !dp.Deleted {
 		t.Errorf("expected data point to be marked deleted")
