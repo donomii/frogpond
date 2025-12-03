@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -123,6 +122,16 @@ func (dpm *DataPoolMap) FromList(dl DataPoolList) {
 	for _, v := range dl {
 		dpm.trie.Set(patricia.Prefix(v.Key), v.DeepCopy())
 	}
+}
+
+func (dpm *DataPoolMap) ForEachPrefix(prefix string, f func(string, DataPoint)) {
+	dpm.mu.RLock()
+	defer dpm.mu.RUnlock()
+	_ = dpm.trie.VisitSubtree(patricia.Prefix(prefix), func(p patricia.Prefix, item patricia.Item) error {
+		v := item.(DataPoint)
+		f(string(p), v.DeepCopy())
+		return nil
+	})
 }
 
 type Node struct {
@@ -252,25 +261,23 @@ func (n *Node) DeleteDataPointWithPrefix(prefix, key string, backdateDuration ti
 
 func (n *Node) DeleteAllMatchingPrefix(keyStr string) []DataPoint {
 	out := []DataPoint{}
-	n.DataPool.ForEach(func(k string, v DataPoint) {
-		if strings.HasPrefix(k, keyStr) {
-			v.Deleted = true
-			v.Updated = time.Now()
-			n.DataPool.Set(k, v)
-			// Append a deep copy to avoid sharing buffers
-			out = append(out, v.DeepCopy())
-		}
+	n.DataPool.mu.Lock()
+	defer n.DataPool.mu.Unlock()
+	_ = n.DataPool.trie.VisitSubtree(patricia.Prefix(keyStr), func(p patricia.Prefix, item patricia.Item) error {
+		v := item.(DataPoint)
+		v.Deleted = true
+		v.Updated = time.Now()
+		n.DataPool.trie.Set(p, v.DeepCopy())
+		out = append(out, v.DeepCopy())
+		return nil
 	})
 	return out
 }
 
 func (n *Node) GetAllMatchingPrefix(keyStr string) []DataPoint {
 	out := []DataPoint{}
-	n.DataPool.ForEach(func(k string, v DataPoint) {
-		if strings.HasPrefix(k, keyStr) {
-			// Append a deep copy to avoid sharing buffers
-			out = append(out, v.DeepCopy())
-		}
+	n.DataPool.ForEachPrefix(keyStr, func(_ string, v DataPoint) {
+		out = append(out, v.DeepCopy())
 	})
 	return out
 }
