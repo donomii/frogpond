@@ -298,12 +298,18 @@ func (n *Node) AppendDataPoint(dataPoint DataPoint) []DataPoint {
 
 func (n *Node) PurgeDeletedDataPoints(t time.Time) []DataPoint {
 	out := []DataPoint{}
+	forDeletion := []DataPoint{}
 	n.DataPool.ForEach(func(key string, v DataPoint) {
 		if v.Deleted && v.Updated.Before(t) {
-			n.DataPool.Delete(key)
+			forDeletion = append(forDeletion, v)
 			out = append(out, v)
 		}
 	})
+
+	for _, v := range forDeletion {
+		n.DataPool.Delete(string(v.Key))
+	}
+
 	return out
 }
 
