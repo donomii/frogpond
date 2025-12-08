@@ -296,6 +296,17 @@ func (n *Node) AppendDataPoint(dataPoint DataPoint) []DataPoint {
 
 }
 
+func (n *Node) PurgeDeletedDataPoints(t time.Time) []DataPoint {
+	out := []DataPoint{}
+	n.DataPool.ForEach(func(key string, v DataPoint) {
+		if v.Deleted && v.Updated.Before(t) {
+			n.DataPool.Delete(key)
+			out = append(out, v)
+		}
+	})
+	return out
+}
+
 type Config struct {
 	HttpPort           uint
 	StartPagePort      uint
