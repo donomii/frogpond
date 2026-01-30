@@ -61,9 +61,11 @@ Data model notes:
 
 ## Security
 
-Frogpond communicates over HTTP, and does not authenticate or encrypt.  It is not secure.  It is intended for use on a local network, where the only people who can see the traffic are people you trust.
+The programs here are demonstration programs to show how to use Frogpond.  They are not secure, and should not be used on the Internet.  When you use Frogpond in your own projects, you will implement your own security measures, or integrate with existing security measures.
 
-Do not use Frogpond on the Internet.
+Frogpond is transport agnostic, but the demonstration programs here use HTTP.  The demonstration programs are not secure.  They are intended for use on a local network, where the only people who can see the traffic are people you trust.
+
+Do not use the demonstration programs on the Internet.
 
 ## Design
 

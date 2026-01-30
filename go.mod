@@ -9,3 +9,6 @@ require (
 	github.com/tchap/go-patricia v1.0.1
 	golang.org/x/sync v0.18.0
 )
+
+replace gitlab.com/donomii/ensemblekv => ../ensemblekv
+require gitlab.com/donomii/ensemblekv v0.0.0

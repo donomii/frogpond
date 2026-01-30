@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/tchap/go-patricia/patricia"
+	"gitlab.com/donomii/ensemblekv"
 )
 
 type DataPoint struct {
@@ -52,17 +53,32 @@ func (a DataPoolList) Less(i, j int) bool { return bytes.Compare(a[i].Key, a[j].
 func (a DataPoolList) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 
 type DataPoolMap struct {
-	mu   sync.RWMutex
-	trie *patricia.Trie
+	mu      sync.RWMutex
+	trie    *patricia.Trie
+	backend ensemblekv.KvLike
 }
 
 func NewDataPoolMap() *DataPoolMap {
-	return &DataPoolMap{trie: patricia.NewTrie()}
+	return &DataPoolMap{trie: patricia.NewTrie(), backend: nil}
 }
 
 func (dpm *DataPoolMap) Get(key string) (DataPoint, bool) {
 	dpm.mu.RLock()
 	defer dpm.mu.RUnlock()
+
+	if dpm.backend != nil {
+		data, err := dpm.backend.Get([]byte(key))
+		if err != nil {
+			return DataPoint{}, false
+		}
+		var dp DataPoint
+		if err := json.Unmarshal(data, &dp); err != nil {
+			log.Printf("WARNING: failed to unmarshal data for key %q: %v (data may be corrupt)", key, err)
+			return DataPoint{}, false
+		}
+		return dp, true
+	}
+
 	item := dpm.trie.Get(patricia.Prefix(key))
 	if item == nil {
 		return DataPoint{}, false
@@ -77,18 +93,51 @@ func (dpm *DataPoolMap) Get(key string) (DataPoint, bool) {
 func (dpm *DataPoolMap) Set(key string, value DataPoint) {
 	dpm.mu.Lock()
 	defer dpm.mu.Unlock()
+
+	if dpm.backend != nil {
+		data, err := json.Marshal(value)
+		if err != nil {
+			panic(fmt.Sprintf("failed to marshal datapoint: %v", err))
+		}
+		if err := dpm.backend.Put([]byte(key), data); err != nil {
+			panic(fmt.Sprintf("failed to write to backend: %v", err))
+		}
+		return
+	}
+
 	dpm.trie.Set(patricia.Prefix(key), value.DeepCopy())
 }
 
 func (dpm *DataPoolMap) Delete(key string) {
 	dpm.mu.Lock()
 	defer dpm.mu.Unlock()
+
+	if dpm.backend != nil {
+		if err := dpm.backend.Delete([]byte(key)); err != nil {
+			panic(fmt.Sprintf("failed to delete key %q from backend: %v", key, err))
+		}
+		return
+	}
+
 	dpm.trie.Delete(patricia.Prefix(key))
 }
 
 func (dpm *DataPoolMap) ForEach(f func(string, DataPoint)) {
 	dpm.mu.RLock()
 	defer dpm.mu.RUnlock()
+
+	if dpm.backend != nil {
+		// ensemblekv MapFunc iterates all keys
+		_, _ = dpm.backend.MapFunc(func(k, v []byte) error {
+			var dp DataPoint
+			if err := json.Unmarshal(v, &dp); err == nil {
+				f(string(k), dp)
+			}
+			return nil
+		})
+		return
+	}
+
 	_ = dpm.trie.Visit(func(prefix patricia.Prefix, item patricia.Item) error {
 		v, ok := item.(DataPoint)
 		if !ok {
@@ -103,6 +152,19 @@ func (dpm *DataPoolMap) ToList() DataPoolList {
 	dpm.mu.RLock()
 	defer dpm.mu.RUnlock()
 	out := DataPoolList{}
+
+	if dpm.backend != nil {
+		_, _ = dpm.backend.MapFunc(func(k, v []byte) error {
+			var dp DataPoint
+			if err := json.Unmarshal(v, &dp); err == nil {
+				out = append(out, dp)
+			}
+			return nil
+		})
+		sort.Sort(out)
+		return out
+	}
+
 	_ = dpm.trie.Visit(func(_ patricia.Prefix, item patricia.Item) error {
 		v, ok := item.(DataPoint)
 		if !ok {
@@ -119,6 +181,21 @@ func (dpm *DataPoolMap) ToList() DataPoolList {
 func (dpm *DataPoolMap) FromList(dl DataPoolList) {
 	dpm.mu.Lock()
 	defer dpm.mu.Unlock()
+
+	if dpm.backend != nil {
+		// For backend, we iterate the list and insert
+		for _, v := range dl {
+			data, err := json.Marshal(v)
+			if err != nil {
+				panic(err)
+			}
+			if err := dpm.backend.Put(v.Key, data); err != nil {
+				panic(err)
+			}
+		}
+		return
+	}
+
 	for _, v := range dl {
 		dpm.trie.Set(patricia.Prefix(v.Key), v.DeepCopy())
 	}
@@ -127,6 +204,19 @@ func (dpm *DataPoolMap) FromList(dl DataPoolList) {
 func (dpm *DataPoolMap) ForEachPrefix(prefix string, f func(string, DataPoint)) {
 	dpm.mu.RLock()
 	defer dpm.mu.RUnlock()
+
+	if dpm.backend != nil {
+		// Use backend's MapPrefixFunc
+		_, _ = dpm.backend.MapPrefixFunc([]byte(prefix), func(k, v []byte) error {
+			var dp DataPoint
+			if err := json.Unmarshal(v, &dp); err == nil {
+				f(string(k), dp)
+			}
+			return nil
+		})
+		return
+	}
+
 	_ = dpm.trie.VisitSubtree(patricia.Prefix(prefix), func(p patricia.Prefix, item patricia.Item) error {
 		v := item.(DataPoint)
 		f(string(p), v.DeepCopy())
