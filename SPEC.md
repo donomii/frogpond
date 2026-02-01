@@ -60,25 +60,11 @@ Frogpond employs a **Last-Write-Wins (LWW)** strategy:
 *   **JSON Dump**: Serializes the store to JSON.
 *   **Purge**: Removes soft-deleted items older than a specific time.
 
-## Limitations & Risks
 
-1.  **Clock Skew**: Relying on `time.Time` (wall clock) is dangerous in distributed systems. If a node's clock is behind, its updates may be ignored. If ahead, its updates may overwrite legitimate newer data from others.
-2.  **Inefficient Sync**: Synchronization currently involves exchanging lists of `DataPoint`s (`DataPoolList`). This is O(N) and network-intensive for large datasets.
-3.  **Tombstone Accumulation**: While `PurgeDeletedDataPoints` exists, there is no automated garbage collection of tombstones, which can lead to memory bloat over time.
-4.  **No Type Safety**: Values are raw `[]byte`. Applications must handle serialization/deserialization manually, increasing the risk of runtime errors.
-5.  **Memory Only**: The store is purely in-memory. There is no built-in persistence to disk (WAL, snapshotting).
 
 ## Proposed Additions
 
-To complete the library and make it production-ready, I propose the following additions:
 
-### 1. Logical Clocks (Vector Clocks or Hybrid Logical Clocks)
-*   **Why**: To solve the clock skew issue.
-*   **Plan**: Replace or augment `time.Time` with a Vector Clock or Hybrid Logical Clock (HLC). This ensures causal consistency and robust conflict resolution independent of system time.
-
-### 2. Efficient Synchronization (Merkle Trees / Anti-Entropy)
-*   **Why**: To avoid sending the entire dataset for sync.
-*   **Plan**: Implement a Merkle Tree or naive diffing protocol (send hashes of ranges) to identify and exchange only the parts of the data that differ.
 
 ### 3. Pub/Sub Logic
 *   **Why**: Applications often need to react to changes immediately.
@@ -91,7 +77,3 @@ To complete the library and make it production-ready, I propose the following ad
 ### 5. Typed Wrappers
 *   **Why**: To improve developer experience and safety.
 *   **Plan**: data generics or helper functions for common types (string, int, json) that automatically handle marshalling.
-
-### 6. Gossip Protocol Integration
-*   **Why**: To automate peer discovery and data propagation.
-*   **Plan**: Implement a basic gossip protocol (like SWIM or simple random peering) using the `Networks` and `KnownPeers` config fields, which are currently unused in the core logic.
